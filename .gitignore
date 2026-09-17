@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Environment
+.env
+.env.local
+
+# Runtime session data (uploaded files + per-session DuckDB databases)
+backend/.sessions/
+*.duckdb
+*.duckdb.wal
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+.vercel/
+
+# Editors / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Assignment brief - keep out of the public repo
+FDE_Assignment_Darwinbox.pdf
