@@ -138,21 +138,59 @@ First rows of a table. `limit` defaults to 20, clamped to 1–200.
 
 ---
 
-## `POST /api/sessions/{session_id}/ask` — *milestone 2*
+## `POST /api/sessions/{session_id}/ask`
 
-Planned contract:
+Answer a plain-English question against the session's uploaded data. See
+[03 · Data pipeline](03-data-pipeline.md) for how the schema is built and
+[02 · Architecture](02-architecture.md#request-flow-ask) for the full
+generate → validate → execute → repair pipeline.
 
+```bash
+curl -X POST http://localhost:8000/api/sessions/$SID/ask \
+  -H "Content-Type: application/json" \
+  -d '{"question": "Average base salary by department in 2024?"}'
+```
+
+**Request**
 ```json
-// request
 { "question": "Average base salary by department in 2024?" }
+```
+`question` must be 1–2000 characters (`422` otherwise, before any LLM call).
 
-// response
+**Response `200`**
+```json
 {
   "answer": "Engineering has the highest average base salary at ₹28.4L.",
-  "sql": "SELECT d.department_name, AVG(s.base_salary_inr) ...",
+  "sql": "SELECT d.department_name, AVG(s.base_salary_inr) AS avg_base_salary FROM departments d JOIN employees e ON e.department_id = d.id JOIN salaries_2024 s ON s.employee_id = e.employee_id GROUP BY d.department_name LIMIT 1001",
   "columns": ["department_name", "avg_base_salary"],
-  "rows": [ ["Engineering", 2840000] ],
-  "chart": { "type": "bar", "x": "department_name", "y": ["avg_base_salary"] },
-  "tables_used": ["salaries_2024", "employees", "departments"]
+  "rows": [["Engineering", 2840000]],
+  "row_count": 1,
+  "truncated": false,
+  "chart": { "type": "bar", "x": "department_name", "y": ["avg_base_salary"], "reason": "One category column with 5 rows: a direct comparison." },
+  "tables_used": ["departments", "employees", "salaries_2024"],
+  "repaired": false,
+  "assumptions": []
 }
 ```
+
+| Field | Notes |
+|---|---|
+| `sql` | The exact statement executed, including the injected `LIMIT`. Always shown to the user — the SQL transparency panel is not optional, see [ADR-0001](decisions/0001-nl-to-sql-over-duckdb.md) |
+| `chart.type` | `kpi \| line \| bar \| pie \| scatter \| table`, chosen by rules from the result's shape — never by the model. See [ADR-0003](decisions/0003-rule-based-chart-selection.md) |
+| `truncated` | `true` if the real result had more than `MAX_RESULT_ROWS` (default 1000) and was cut off |
+| `repaired` | `true` if the first generated SQL failed validation or execution and a second, corrected attempt succeeded |
+| `assumptions` | Explicit interpretations the model made for an ambiguous question (e.g. *"interpreting 'top' as highest total_sales"*); empty when the question wasn't ambiguous |
+
+**Errors**
+
+| Status | Cause |
+|---|---|
+| `400` | No files uploaded yet in this session |
+| `422` | Neither the first nor the repaired SQL could be validated/executed |
+| `502` | The LLM provider is unreachable, misconfigured (e.g. missing `GROQ_API_KEY`), or rate-limited |
+| `504` | The query ran past `QUERY_TIMEOUT_SECONDS` (default 30) and was cancelled |
+
+A `DROP`, `INSERT`, or any non-`SELECT` statement the model might generate is rejected by
+`sql_guard.py` *before* it reaches DuckDB — that rejection is treated exactly like any other
+failed attempt and triggers the same one-shot repair, not a security exception. Uploaded data
+is never modified by a question, no matter what the model writes.

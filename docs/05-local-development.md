@@ -24,6 +24,11 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
+To ask questions (`/ask`), set `GROQ_API_KEY` in `.env` — a free key from
+[console.groq.com](https://console.groq.com). Everything else (upload, schema, preview) works
+without one. To run fully offline instead, install [Ollama](https://ollama.com), run
+`ollama pull qwen2.5-coder:7b`, and set `LLM_PROVIDER=ollama`.
+
 ## Generate sample data
 
 Three related, deliberately messy files (untidy headers, a foreign key, a two-sheet workbook):
@@ -53,6 +58,10 @@ SID=$(curl -s -X POST localhost:8000/api/sessions | python -c "import sys,json;p
 curl -s -X POST localhost:8000/api/sessions/$SID/files -F "files=@sample-data/employees.csv" -F "files=@sample-data/departments.csv" -F "files=@sample-data/salaries.xlsx"
 ```
 
+```bash
+curl -s -X POST localhost:8000/api/sessions/$SID/ask -H "Content-Type: application/json" -d '{"question": "Average base salary by department in 2024?"}'
+```
+
 ## Tests
 
 From `backend/`:
@@ -63,12 +72,18 @@ python -m pytest -q
 
 Tests point `SESSION_DIR` at a temp directory before the app is imported, so they never touch
 your real `.sessions/`. The API tests rely on `sample-data/` — they skip with a message if it
-hasn't been generated.
+hasn't been generated. **No test calls a real LLM or the network** — `/ask` is tested against a
+scripted `FakeLLMClient` (see `test_ask_api.py`), so the suite is fast and deterministic without
+a `GROQ_API_KEY`.
 
 | File | Covers |
 |---|---|
 | `tests/test_naming.py` | Header and table-name normalisation (pure functions) |
 | `tests/test_ingestion_api.py` | Upload, multi-sheet, profiling, semantic types, joins, error paths |
+| `tests/test_sql_guard.py` | Statement allow-list, function deny-list, table checks, row-cap injection |
+| `tests/test_charts.py` | Every chart-selection rule against fixed result sets |
+| `tests/test_llm_json_extraction.py` | Recovering JSON from markdown-fenced / preambled model output |
+| `tests/test_ask_api.py` | Full `/ask` pipeline via a fake LLM: happy path, repair loop, rejected DROP, empty session, summary fallback |
 
 ## Docker
 
@@ -88,12 +103,19 @@ backend/
 │  │  ├─ config.py         settings from env
 │  │  ├─ errors.py         domain exceptions → status codes
 │  │  └─ session.py        session registry + DuckDB handles
-│  └─ ingestion/
-│     ├─ loader.py         files → tables
-│     ├─ naming.py         identifier normalisation
-│     ├─ profiler.py       column profiles + semantic types
-│     ├─ joins.py          relationship inference
-│     └─ catalog.py        schema assembly + cache
+│  ├─ ingestion/
+│  │  ├─ loader.py         files → tables
+│  │  ├─ naming.py         identifier normalisation
+│  │  ├─ profiler.py       column profiles + semantic types
+│  │  ├─ joins.py          relationship inference
+│  │  └─ catalog.py        schema assembly + cache
+│  └─ query/
+│     ├─ prompts.py        schema → LLM prompt text
+│     ├─ llm.py            Groq | Ollama, one interface
+│     ├─ sql_guard.py      allow-list validation, row cap
+│     ├─ executor.py       async execution, timeout, truncation
+│     ├─ charts.py         result shape → chart spec
+│     └─ service.py        orchestrates ask() end to end
 └─ tests/
 ```
 

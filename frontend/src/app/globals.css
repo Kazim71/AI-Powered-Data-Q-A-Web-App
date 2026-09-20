@@ -1,0 +1,154 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------
+ * Design tokens — see docs/09-frontend-design-direction.md for the full
+ * rationale behind every value here. Nothing in this file is decorative;
+ * each token is used somewhere specific (see that doc's "Use" column).
+ * ------------------------------------------------------------------- */
+
+:root {
+  --bg: #f7f5f0;
+  --surface: #ffffff;
+  --surface-sunken: #efebe3;
+  --border: #ded7c9;
+  --text: #1c1b17;
+  --text-muted: #6b6459;
+
+  --primary: #0e5f56;
+  --primary-contrast: #ffffff;
+  --accent: #b7791f;
+
+  --success: #2e7d5b;
+  --warning: #a56a1b;
+  --error: #a23b2e;
+  --info: #3b6e91;
+
+  /* Chart series — categorical, six colours before any repeat. */
+  --chart-1: #0e5f56;
+  --chart-2: #b7791f;
+  --chart-3: #3b6e91;
+  --chart-4: #8a4b6b;
+  --chart-5: #5b7a3a;
+  --chart-6: #94582c;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+
+  --shadow-lift: 0 1px 3px rgba(28, 27, 23, 0.12);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #15181a;
+    --surface: #1c2023;
+    --surface-sunken: #101314;
+    --border: #2b3033;
+    --text: #edeae2;
+    --text-muted: #9b948a;
+
+    --primary: #4fbfa8;
+    --primary-contrast: #0b211d;
+    --accent: #d9a345;
+
+    --success: #5fc594;
+    --warning: #d9a345;
+    --error: #e08776;
+    --info: #7fb4d9;
+
+    --shadow-lift: 0 1px 3px rgba(0, 0, 0, 0.4);
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+
+  --color-primary: var(--primary);
+  --color-primary-contrast: var(--primary-contrast);
+  --color-accent: var(--accent);
+
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-error: var(--error);
+  --color-info: var(--info);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-chart-6: var(--chart-6);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+
+  --font-sans: var(--font-public-sans);
+  --font-mono: var(--font-plex-mono);
+
+  --breakpoint-sm: 480px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+}
+
+* {
+  border-color: var(--border);
+}
+
+html {
+  color-scheme: light dark;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 24px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Every number, SQL token, and column/table name reads in mono with
+ * tabular figures — so a column of numbers actually lines up. This is a
+ * functional choice (data must be comparable), not a terminal aesthetic. */
+.font-data {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Motion confirms a state change; it never carries information alone, and
+ * the UI must be fully usable with all of it switched off. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-rise-in {
+  animation: rise-in 180ms ease-out;
+}

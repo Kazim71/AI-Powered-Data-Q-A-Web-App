@@ -94,3 +94,48 @@ class UploadResponse(BaseModel):
 class SessionCreatedResponse(BaseModel):
     session_id: str
     created_at: datetime
+
+
+# --- Question answering ----------------------------------------------------
+
+ChartType = Literal["kpi", "line", "bar", "pie", "scatter", "table"]
+
+
+class ChartSpec(BaseModel):
+    """A rendering instruction for the frontend, chosen by rules, not the LLM.
+
+    See docs/decisions/0003-rule-based-chart-selection.md — the chart is picked
+    from the *executed result's* shape, so it can never reference a column
+    that isn't actually in the data or suit data it hasn't seen.
+    """
+
+    type: ChartType
+    x: str | None = Field(default=None, description="Column mapped to the x-axis / labels")
+    y: list[str] = Field(default_factory=list, description="Column(s) mapped to values")
+    reason: str = Field(description="Why this chart was picked, for debugging/UI hint")
+
+
+class AskRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=2000)
+
+
+class AskResponse(BaseModel):
+    """Everything the UI needs to render one answer."""
+
+    answer: str = Field(description="One or two sentence natural-language answer")
+    sql: str = Field(description="The exact SQL that was executed")
+    columns: list[str]
+    rows: list[list[Any]]
+    row_count: int = Field(description="Rows actually returned (may be capped)")
+    truncated: bool = Field(
+        default=False, description="True if the result was cut off at the row cap"
+    )
+    chart: ChartSpec
+    tables_used: list[str]
+    repaired: bool = Field(
+        default=False, description="True if the first generated SQL failed and was retried"
+    )
+    assumptions: list[str] = Field(
+        default_factory=list,
+        description="Explicit interpretations the model made for an ambiguous question",
+    )

@@ -42,3 +42,21 @@ class IngestionError(AppError):
     """A file was readable but could not be turned into a usable table."""
 
     status_code = 422
+
+
+class EmptySession(AppError):
+    """A question was asked before any file was uploaded."""
+
+    status_code = 400
+
+
+class LLMError(AppError):
+    """The LLM provider could not be reached or returned something unusable."""
+
+    status_code = 502
+
+
+class SQLGenerationError(AppError):
+    """The model's SQL failed validation or execution, even after one repair."""
+
+    status_code = 422

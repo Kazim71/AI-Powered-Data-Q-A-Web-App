@@ -7,22 +7,8 @@ answer quality regresses with it.
 
 from __future__ import annotations
 
-import io
-
-from fastapi.testclient import TestClient
-
-
-def _upload(client: TestClient, session_id: str, files: list[tuple[str, bytes]]):
-    payload = [("files", (name, io.BytesIO(content))) for name, content in files]
-    return client.post(f"/api/sessions/{session_id}/files", files=payload)
-
-
-def _upload_samples(client, session_id, sample_files):
-    return _upload(
-        client,
-        session_id,
-        [(p.name, p.read_bytes()) for p in sample_files.values()],
-    )
+from tests.conftest import upload_files as _upload
+from tests.conftest import upload_sample_files as _upload_samples
 
 
 def _columns(schema: dict, table: str) -> dict[str, dict]:

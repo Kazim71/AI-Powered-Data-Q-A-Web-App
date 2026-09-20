@@ -30,9 +30,12 @@ hand-written code volume.
 | # | Criterion | Approach | Status |
 |---|---|---|---|
 | 1 | Multi-file upload | `POST /sessions/{id}/files` accepts many files; per-file status so one bad file doesn't fail the batch | ✅ Built |
-| 2 | Cross-file analysis | Every file is a DuckDB table in one database, so JOINs are native. Join keys are **inferred and measured**, not guessed by the LLM | ✅ Joins inferred · ⏳ NL→SQL next |
-| 3 | Visual insights | Rule engine picks chart type from the *shape of the result set* | ⏳ Milestone 2 |
-| 4 | Delta solutioning on top of AI | Column profiling, join inference, SQL guardrails + repair loop, deterministic charts, SQL transparency | 🟡 2 of 5 built |
+| 2 | Cross-file analysis | Every file is a DuckDB table in one database, so JOINs are native. Join keys are **inferred and measured**, and the LLM turns the question into validated SQL, with one self-repair round on failure | ✅ Built |
+| 3 | Visual insights | Rule engine picks chart type from the *executed result's* shape — never the LLM | ✅ Built |
+| 4 | Delta solutioning on top of AI | Column profiling, measured join inference, SQL guardrails (allow-list + function deny-list) with a repair loop, deterministic charts, SQL transparency, graceful fallback when the summary call fails | ✅ Built — all 5 |
+
+Backend is feature-complete for the brief's four acceptance criteria; remaining work is the
+frontend ([milestone 3](08-roadmap.md)) that presents all of this to a user.
 
 ## The core idea in one paragraph
 

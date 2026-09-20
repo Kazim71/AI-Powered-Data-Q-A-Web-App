@@ -39,3 +39,18 @@ No agent framework: two prompts (SQL generation, answer summary) called with pla
   recorded locally.
 - Sample values in the profile *are* real data points sent to the API. Acceptable for a
   prototype; a production version would make sampling opt-out per column.
+
+## Update — 2026-09-17
+
+`llama-3.3-70b-versatile` was deprecated by Groq and returns `404 model_not_found` — confirmed
+against a live account's `/v1/models` listing, which no longer includes any Llama model.
+**Default model switched to `openai/gpt-oss-120b`**, also served on Groq: OpenAI's Apache-2.0
+open-weight release, so the "open-source AI models" requirement still holds. Verified against
+four real questions on the sample data (cross-file join + aggregation, a date-trend query, an
+ambiguous "top performers" question, and a zero-result question) — correct on the first
+attempt in all four cases, no repair needed. See the session 3 entry in
+[07 · Progress log](../07-progress-log.md) for the full verification.
+
+This doesn't change the decision itself — Groq, open-weights, Ollama fallback, provider
+interface — only the specific model name, which is exactly the kind of thing a provider can
+change without notice. `GROQ_MODEL` stays a plain env var for that reason.

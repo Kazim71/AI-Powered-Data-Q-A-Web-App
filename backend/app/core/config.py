@@ -43,6 +43,29 @@ class Settings(BaseSettings):
     # --- CORS ----------------------------------------------------------
     cors_origins: str = "http://localhost:3000"
 
+    # --- LLM -------------------------------------------------------------
+    # "groq" (hosted, free-tier, open-weights Llama) or "ollama" (fully local
+    # — no data or schema metadata leaves the machine). See
+    # docs/decisions/0002-open-weights-llm-via-groq.md.
+    llm_provider: str = "groq"
+
+    groq_api_key: str = ""
+    groq_model: str = "openai/gpt-oss-120b"
+    groq_base_url: str = "https://api.groq.com/openai/v1"
+
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_model: str = "qwen2.5-coder:7b"
+
+    llm_timeout_seconds: int = 20
+    # SQL generation is deterministic-ish; the summary call can be a little
+    # freer without risking a different query shape.
+    llm_temperature_sql: float = 0.0
+    llm_temperature_summary: float = 0.3
+
+    # A single self-repair round trip on a SQL execution error. Kept at 1:
+    # more retries burn latency and free-tier quota for diminishing returns.
+    sql_repair_attempts: int = 1
+
     @property
     def max_upload_bytes(self) -> int:
         return self.max_upload_mb * 1024 * 1024

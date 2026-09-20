@@ -4,7 +4,7 @@
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│  Frontend — Next.js + Tailwind + shadcn/ui + Recharts        │  ⏳ milestone 3
+│  Frontend — Next.js + TypeScript + Tailwind v4 + Recharts    │  ✅
 │  Upload zone · Chat · Result table · Chart · SQL panel       │
 └──────────────────────────────┬───────────────────────────────┘
                                │  REST / JSON + multipart
@@ -22,11 +22,13 @@
 │        │      joins.py     relationship inference             │
 │        │      catalog.py   builds + caches the schema         │
 │        │                                                      │
-│        └──▶ query/  (next)                                    │  ⏳ milestone 2
+│        └──▶ query/                                            │  ✅
 │               prompts.py   schema → prompt                    │
 │               llm.py       Groq | Ollama                      │
-│               sql_guard.py sqlglot validation + repair        │
+│               sql_guard.py sqlglot validation                 │
+│               executor.py  timeout, row cap, truncation        │
 │               charts.py    result shape → chart spec          │
+│               service.py   orchestrates ask end to end         │
 │                                                               │
 │   ┌────────────────────────────────────────────┐              │
 │   │ .sessions/<id>/uploads/   raw files        │              │
@@ -71,28 +73,49 @@ POST /api/sessions/{id}/files   (multipart, N files)
 Profiling runs **once after the batch**, not per file, so join inference always sees the
 complete set of tables.
 
-## Request flow: ask *(milestone 2 — designed, not yet built)*
+## Request flow: ask
 
 ```
 POST /api/sessions/{id}/ask  { question }
  ├─ load cached schema                          (no re-scan)
- ├─ LLM: schema + join hints + question → SQL
- ├─ sql_guard: parse with sqlglot
- │    ├─ must be a single SELECT / WITH
- │    └─ every table + column must exist
- ├─ execute in DuckDB with row cap + timeout
- ├─ on error → one repair round with the error message
- ├─ charts.pick(result)                         (deterministic)
- ├─ LLM: small result → one-sentence answer
- └─ { answer, sql, columns, rows, chart, tables_used }
+ ├─ reject if the session has no tables          → EmptySession, 400
+ │
+ ├─ LLM: schema + join hints + question → {sql, assumptions}   (JSON, temperature 0)
+ │
+ ├─ sql_guard.validate_sql                       (pure, no I/O)
+ │    ├─ parse with sqlglot; exactly one statement
+ │    ├─ root must be SELECT/WITH/set-op — allow-list, not a keyword deny-list
+ │    ├─ reject filesystem/system functions (read_csv, getenv, ...)
+ │    ├─ every referenced table must be in the session's real tables
+ │    └─ inject/tighten LIMIT to row_cap + 1 (the +1 signals truncation)
+ │
+ ├─ executor.execute_query                       (async, DuckDB on a worker thread)
+ │    ├─ asyncio.wait_for(..., timeout) → interrupt() the connection on timeout
+ │    └─ trim the extra row, set `truncated`
+ │
+ ├─ on SQLGenerationError / QueryExecutionError / QueryTimeout:
+ │    └─ ONE repair round — feed the exact error back to the LLM, retry the
+ │       three steps above once more; still failing → 422/504, no more retries
+ │
+ ├─ charts.pick_chart(result)                    (pure function, no LLM)
+ ├─ LLM: question + small result → {"answer": "..."}   (temperature 0.3)
+ │    └─ on failure, fall back to a plain "Returned N rows..." — a flaky
+ │       summary call never discards a query that already succeeded
+ │
+ └─ AskResponse { answer, sql, columns, rows, row_count, truncated,
+                  chart, tables_used, repaired, assumptions }
 ```
+
+Code: `backend/app/query/` — `prompts.py` (pure string building), `llm.py` (Groq/Ollama behind
+one interface), `sql_guard.py` (pure validation), `executor.py` (DuckDB + timeout), `charts.py`
+(pure function), `service.py` (orchestrates the above; the only module that calls them together).
 
 ## Why these components
 
 | Component | Rationale | ADR |
 |---|---|---|
 | DuckDB | In-process, native CSV, cross-file JOINs free | [0001](decisions/0001-nl-to-sql-over-duckdb.md) |
-| Groq / Llama 3.3 | Open-weights, free tier, fast; Ollama for offline | [0002](decisions/0002-open-weights-llm-via-groq.md) |
+| Groq (open-weights model) | Free tier, fast; Ollama for offline | [0002](decisions/0002-open-weights-llm-via-groq.md) |
 | Rule-based charts | Charts can't hallucinate | [0003](decisions/0003-rule-based-chart-selection.md) |
 | Per-session DuckDB file | Isolation without tenancy logic | [0004](decisions/0004-session-model.md) |
 | Semantic types | Stops the model summing an ID column | [0005](decisions/0005-semantic-type-classification.md) |

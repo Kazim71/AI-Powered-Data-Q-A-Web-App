@@ -6,7 +6,6 @@ or query layer, and shapes a response. No business logic lives here.
 
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 
 from fastapi import APIRouter, File, UploadFile
@@ -24,11 +23,14 @@ from app.core.session import registry
 from app.ingestion import catalog
 from app.ingestion.loader import is_supported, load_file
 from app.models import (
+    AskRequest,
+    AskResponse,
     SessionCreatedResponse,
     SessionSchema,
     UploadedFileResult,
     UploadResponse,
 )
+from app.query.service import answer_question
 
 router = APIRouter()
 
@@ -160,3 +162,14 @@ def preview_table(session_id: str, table: str, limit: int = 20) -> dict:
     columns = [d[0] for d in cursor.description]
     rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
     return {"table": table, "columns": columns, "rows": rows}
+
+
+@router.post("/sessions/{session_id}/ask", response_model=AskResponse, tags=["query"])
+async def ask(session_id: str, body: AskRequest) -> AskResponse:
+    """Answer a plain-English question against the session's uploaded data.
+
+    See app/query/service.py for the full pipeline: generate SQL, validate,
+    execute, repair once on failure, pick a chart, summarise.
+    """
+    session = registry.get(session_id)
+    return await answer_question(session, body.question)

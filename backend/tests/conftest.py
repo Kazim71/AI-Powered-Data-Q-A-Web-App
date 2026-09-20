@@ -6,6 +6,7 @@ test run never touches the developer's real .sessions folder.
 
 from __future__ import annotations
 
+import io
 import os
 import tempfile
 from pathlib import Path
@@ -48,3 +49,32 @@ def sample_files() -> dict[str, Path]:
     if missing:
         pytest.skip(f"Sample data missing, run sample-data/generate.py: {missing}")
     return files
+
+
+def upload_files(
+    client: TestClient, session_id: str, files: list[tuple[str, bytes]]
+):
+    """POST a batch of (filename, content) pairs to a session. Shared across
+    test modules so every upload in the suite goes through one code path."""
+    payload = [("files", (name, io.BytesIO(content))) for name, content in files]
+    return client.post(f"/api/sessions/{session_id}/files", files=payload)
+
+
+def upload_sample_files(
+    client: TestClient, session_id: str, sample_files: dict[str, Path]
+):
+    return upload_files(
+        client,
+        session_id,
+        [(p.name, p.read_bytes()) for p in sample_files.values()],
+    )
+
+
+@pytest.fixture
+def populated_session_id(
+    client: TestClient, session_id: str, sample_files: dict[str, Path]
+) -> str:
+    """A session with employees/departments/salaries already uploaded."""
+    response = upload_sample_files(client, session_id, sample_files)
+    assert response.status_code == 200
+    return session_id
