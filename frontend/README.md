@@ -60,20 +60,29 @@ more control over avoiding the generic look than pulling in and then fighting de
 Motion is a handful of CSS transitions/keyframes in `globals.css`, respecting
 `prefers-reduced-motion`.
 
-## A known environment gotcha
+## A known environment gotcha (Windows only)
 
-`npx <tool>` fails on this machine with `Cannot find module '...'` — the repo path contains
-`Q&A`, and something in npx's Windows process spawning mishandles the literal `&`. Workaround:
-call the local binary directly instead of through npx, e.g.:
+If your checkout's path contains a literal `&` (e.g. this repo cloned somewhere under a folder
+named with "Q&A" in it), `cmd.exe` — npm's default script shell on Windows — mangles it, and
+**every** npm script fails: `npm run dev`, `build`, `lint`, and any `npx <tool>` call, all with
+some variant of `Cannot find module '...'` or `'X' is not recognized as an internal or external
+command`.
 
-```bash
-node node_modules/typescript/bin/tsc --noEmit
+Fix: create a `frontend/.npmrc` (this file is machine-local and gitignored on purpose — see
+below) pointing npm at Git Bash instead:
+
+```
+script-shell=C:\\Program Files\\Git\\bin\\bash.exe
 ```
 
-```bash
-node node_modules/eslint/bin/eslint.js src
-```
+Adjust the path if Git for Windows is installed elsewhere. With that in place `npm run dev`
+etc. work normally. For a one-off command without wanting to add the file, call the local
+binary directly instead of through `npx`:
 
 ```bash
 node node_modules/next/dist/bin/next build
 ```
+
+**Why `.npmrc` isn't committed:** it hardcodes a Windows path. Committing it would break the
+build on any Linux machine — including Vercel's build servers — since that path simply doesn't
+exist there. This bug is specific to this one Windows checkout's folder name, not the project.

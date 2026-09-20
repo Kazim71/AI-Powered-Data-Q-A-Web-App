@@ -40,6 +40,24 @@ already have Oracle experience, moving the backend to the Oracle VM afterward re
 Render's real weaknesses (cold start ruining a live demo; a mid-session restart losing an
 upload) with no ongoing cost. It's not either/or — do both, cheaply, in that order.
 
+## Deployment order
+
+Backend and frontend are two separate deployments that need each other's URL — a chicken-and-egg
+dependency any two-service split has. Do it in this order, once:
+
+1. **Deploy the backend to Render first** (below). `CORS_ORIGINS` can be left as a placeholder
+   for now — it only matters once real browser requests arrive. Copy the Render URL it gives you
+   (`https://<something>.onrender.com`).
+2. **Deploy the frontend to Vercel**, setting `NEXT_PUBLIC_API_URL` to
+   `https://<something>.onrender.com/api`. This gets **inlined into the JS bundle at build
+   time** (it's a `NEXT_PUBLIC_` var), so it must be set correctly *before* the first build, not
+   patched in afterward — a later change needs a redeploy to take effect, not just a dashboard
+   edit. Copy the Vercel URL it gives you.
+3. **Go back to Render**, set `CORS_ORIGINS` to the real Vercel URL, save. Render auto-redeploys
+   on an env var change — no manual trigger needed.
+4. **Warm the backend** (`GET /api/health` — cold start, see below) and do one real upload +
+   question through the live Vercel URL before calling it done.
+
 ## Render — backend
 
 1. New → **Web Service** → connect the repo.
@@ -68,9 +86,30 @@ The Dockerfile honours Render's injected `$PORT`.
 
 ## Vercel — frontend
 
-1. Import repo → **Root directory:** `frontend`.
-2. Env var `NEXT_PUBLIC_API_URL` = `https://<your-backend>.onrender.com/api` (or your Oracle
-   VM's URL, if using that instead — see below).
+1. [vercel.com/new](https://vercel.com/new) → import this repo.
+2. **This is the one setting that's easy to miss**: the repo is a monorepo (`backend/` +
+   `frontend/` side by side), and Vercel defaults to building from the repo root, where there's
+   no Next.js app — the build will fail immediately. In the import screen (or **Project
+   Settings → General** afterward), set **Root Directory** to `frontend`. Framework Preset
+   (Next.js), Build Command, and Output Directory are all auto-detected correctly once that's
+   set — nothing else to configure there.
+3. **Environment Variables** (same screen, or **Settings → Environment Variables**):
+
+   | Key | Value | Environments |
+   |---|---|---|
+   | `NEXT_PUBLIC_API_URL` | `https://<your-backend>.onrender.com/api` | Production, Preview, Development |
+
+   Set it for **Preview** too, not just Production — otherwise every PR/branch preview deploy
+   silently points at `localhost:8000` (the code's fallback default) and looks broken.
+4. Deploy. Vercel gives you a `https://<project>.vercel.app` URL (plus a unique one per preview
+   deploy) — that's the URL to put back into Render's `CORS_ORIGINS` (see
+   [Deployment order](#deployment-order) above).
+
+**Do not let `frontend/.npmrc` reach this build.** It's a machine-local file (gitignored, not
+committed — see `frontend/README.md`) that only exists to work around a Windows-specific path
+bug during local development. It hardcodes a Windows path to Git Bash; if it were ever committed
+and picked up by Vercel's Linux build image, the build would fail outright trying to spawn a
+shell that doesn't exist there. `git status` should show it as untracked, never staged.
 
 ## Oracle Cloud free VM — backend (alternative to Render)
 

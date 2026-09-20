@@ -253,3 +253,93 @@ e.g. `node node_modules/next/dist/bin/next build` instead of `npx next build`.
 A real browser pass (upload → ask → every chart type → mobile sheet → keyboard-only
 navigation) before this milestone is actually done, then M4: deploy to Render + Vercel, README
 polish, the 1-page write-up, demo recording.
+
+---
+
+## 2026-09-19 · Session 5 — Live troubleshooting: session-expired mislabelling, `npm run dev`
+
+User reported the frontend showing "This session has expired" immediately on first upload.
+
+### Root cause
+The backend simply wasn't running — the frontend was up, but there was nothing at
+`localhost:8000`. That's an easy mistake to make and not itself a bug.
+
+### Real bug found and fixed
+`useWorkspace.ts`'s `handleFilesSelected` caught *any* failure from `createSession()` — network
+refused, CORS, wrong URL, or an actual expired session — and mapped all of them to the same
+"session expired, start a new session" screen. That's actively wrong for the common case: a
+`createSession()` call has no existing session to have expired, so *every* failure there is a
+connectivity/config problem, and "start a new session" would fail identically. Fixed by:
+- `lib/api.ts`: `fetch` throwing a bare `TypeError` (refused connection, DNS failure, CORS
+  rejection) is now normalised into the same `ApiError` shape as an HTTP error response
+  (`status: 0`, matching the convention `uploadFiles`'s XHR path already used), with a message
+  that actually says what's wrong and where it tried to connect.
+- `useWorkspace.ts`: added a distinct `connectionError` state, shown inline in `EmptyState`
+  rather than taking over the whole screen. `sessionExpired` now only fires on a genuine 404
+  from a session that existed and is now gone — checked separately in the upload-batch catch
+  too, which previously only had the generic "mark files failed" path.
+
+### Also, while in there: real UX gaps
+- No way to start a fresh session once one existed, other than triggering the error screen —
+  added a persistent "New session" action in the header.
+- No indication of upload limits (file types, 50 MB, 10 files) before hitting them — added a
+  caption under the upload zone.
+- Multiple turns had no visual separation in the running log — added a rule between them.
+
+### Second issue: `npm run dev` itself was broken, not just `npx`
+Same root cause as the earlier `npx` gotcha (this checkout's path contains "Q&A", and `cmd.exe`
+— npm's default Windows script shell — treats the literal `&` as a command separator) but wider
+than previously scoped: it broke **every** npm script (`dev`, `build`, `lint`, `start`), not
+just one-off `npx` calls. Fixed with `frontend/.npmrc` setting `script-shell` to Git Bash, which
+handles the `&` correctly. Verified `dev`/`build`/`lint` all work with it in place.
+
+### Next
+Deploy prep (M4) surfaced two more real issues around this exact file — see the session 6 entry.
+
+---
+
+## 2026-09-20 · Session 6 — Vercel deployment prep
+
+Asked to prepare the frontend for Vercel. Checked what was actually committed before touching
+anything, since the user commits their own work now — found two real problems in what had
+already landed.
+
+### Bug found and fixed: `frontend/.npmrc` was committed
+The `.npmrc` fix from session 5 (`script-shell` pointed at Git Bash to work around the `&`-in-
+path bug) got committed. That file hardcodes a **Windows** path
+(`C:\Program Files\Git\bin\bash.exe`). Vercel builds on Linux — that path doesn't exist there,
+so a deploy would have failed on the very first `npm install`/`npm run build`, for a reason
+that would have looked completely unrelated to anyone reading the error.
+
+Fixed: `git rm --cached` (kept the file on disk — still needed locally), added `.npmrc` to
+`frontend/.gitignore` with an explanatory comment, documented in `frontend/README.md` as a
+machine-local file to recreate if the same bug shows up elsewhere, not a project setting.
+Confirmed by literally removing it and running `npm run build` on this machine: reproduces the
+exact original failure — proving the fix is real and, just as importantly, that Vercel's Linux
+build environment was never at risk from this bug in the first place (no `cmd.exe`, and their
+build path won't contain `&`).
+
+### Bug found and fixed: `frontend/.env.example` was never actually committed
+`create-next-app`'s default `frontend/.gitignore` has a blanket `.env*` rule, written before
+this project decided to commit an example env file. It silently swallowed
+`frontend/.env.example` — `git status` showed nothing wrong because the file was never staged
+in the first place, not because it was later removed. Anyone cloning the repo fresh had no
+record of `NEXT_PUBLIC_API_URL`, the one env var the frontend needs. Fixed with a `!.env.example`
+negation line and committed the file.
+
+### Documentation
+Expanded [06 · Deployment](06-deployment.md) with a concrete step-by-step Vercel section (Root
+Directory is the setting most likely to be missed in a monorepo import — the repo root has no
+Next.js app in it, so an unset Root Directory fails the build immediately) and a new
+**Deployment order** section up front, since Render and Vercel need each other's URL — backend
+first (CORS placeholder is fine initially) → frontend, with `NEXT_PUBLIC_API_URL` set correctly
+*before* the first build since it's inlined at build time, not read at runtime → back to Render
+to set the real `CORS_ORIGINS` once the Vercel URL is known.
+
+### Verified
+`tsc --noEmit`, `eslint`, and `next build` all still clean after the `.gitignore`/tracking
+changes (which don't touch app code, but worth confirming nothing else regressed).
+
+### Not done this session
+Nothing was actually deployed — that needs the user's own Vercel/Render accounts, which I don't
+have access to. Everything above is prep; the deploy itself is still the next step.
