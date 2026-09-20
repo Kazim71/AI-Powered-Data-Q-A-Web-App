@@ -31,10 +31,12 @@ without one. To run fully offline instead, install [Ollama](https://ollama.com),
 
 ## Generate sample data
 
-Three related, deliberately messy files (untidy headers, a foreign key, a two-sheet workbook):
+Two demo datasets, deliberately in different domains so correctness isn't an artifact of one
+convenient shape of data:
 
 ```bash
-python sample-data/generate.py
+python sample-data/generate.py              # HR: employees/departments/salaries (2-sheet workbook)
+python sample-data/ecommerce/generate.py    # retail: customers/products/orders
 ```
 
 ## Run the server

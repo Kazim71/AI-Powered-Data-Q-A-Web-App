@@ -5,6 +5,14 @@ with charts — and see the exact SQL behind every number.
 
 > Darwinbox Forward Deployed Engineer take-home.
 
+**Live app:** [ai-powered-data-q-a-web-app.vercel.app](https://ai-powered-data-q-a-web-app.vercel.app)
+· **API:** [ai-powered-data-q-a-web-app.onrender.com/api/health](https://ai-powered-data-q-a-web-app.onrender.com/api/health)
+· **Write-up:** [WRITEUP.md](WRITEUP.md) · **Full overview:** [docs/10-project-overview.md](docs/10-project-overview.md)
+
+The API is on Render's free tier and sleeps after ~15 minutes idle — the first request after
+that takes up to ~50s to wake it back up. That's expected, not a bug (see
+[docs/06-deployment.md](docs/06-deployment.md)).
+
 ## How it works
 
 The LLM never sees your data, only a **profile** of it. It writes SQL; **DuckDB computes the
@@ -33,13 +41,14 @@ What sits on top of the raw LLM output:
 | Milestone | |
 |---|---|
 | M1 · Ingestion backend — upload, profiling, join inference | ✅ 26 tests |
-| M2 · Question answering — NL → SQL, guardrails, charts | ✅ 76 tests, verified against a real Groq model |
-| M3 · Frontend | ✅ builds clean, not yet click-through tested in a browser |
-| M4 · Deploy + write-up | ⏳ |
+| M2 · Question answering — NL → SQL, guardrails, charts | ✅ 78 tests, verified against a real Groq model |
+| M3 · Frontend | ✅ live and click-tested in a real browser |
+| M4 · Deploy + write-up | ✅ live on Render + Vercel; write-up above |
 
-All four acceptance criteria in the brief are met end to end. Try the API via `/docs` (below),
-the app via `npm run dev` in [frontend/](frontend), or see the full request/response shapes in
-[docs/04-api-reference.md](docs/04-api-reference.md).
+All four acceptance criteria in the brief are met end to end, verified against two separate
+sample datasets (HR and e-commerce) — see [docs/10-project-overview.md](docs/10-project-overview.md#tested-scenarios-real-runs-both-sample-datasets)
+for the real, run Q&A pairs. Try it live (above), locally via `npm run dev` (below), or the API
+directly via `/docs` on the Render URL.
 
 ## Tech stack
 
@@ -60,7 +69,7 @@ cd backend && python -m venv .venv && source .venv/Scripts/activate && pip insta
 ```
 
 ```bash
-python sample-data/generate.py
+python sample-data/generate.py && python sample-data/ecommerce/generate.py
 ```
 
 ```bash
@@ -97,13 +106,15 @@ Open http://localhost:3000.
 │  │  └─ query/      question → SQL → validate → execute → chart → answer
 │  └─ tests/         76 tests, no network calls
 ├─ frontend/         Next.js app — the workspace UI (upload, ask, answer/chart/table/SQL)
-├─ sample-data/      generator for 3 related demo files
+├─ sample-data/      two demo datasets: HR (root) and e-commerce (ecommerce/)
 └─ docs/             architecture, API, decisions, progress log
 ```
 
 ## Documentation
 
-Start at **[docs/README.md](docs/README.md)**. Highlights:
+**Start at [docs/10-project-overview.md](docs/10-project-overview.md)** — a self-contained
+what/why/how, tech-stack rationale, and real tested Q&A scenarios, written for review. The
+full index is at [docs/README.md](docs/README.md). Highlights:
 
 - [Architecture](docs/02-architecture.md)
 - [Data pipeline](docs/03-data-pipeline.md)

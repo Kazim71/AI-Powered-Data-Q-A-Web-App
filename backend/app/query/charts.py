@@ -84,10 +84,18 @@ def pick_chart(columns: list[str], rows: list[list[object]]) -> ChartSpec:
     temporal_cols = [columns[i] for i in temporal_idx]
     other_cols = [columns[i] for i in other_idx]
 
-    # 1 row x 1 numeric column -> a single headline figure, not a chart at all.
-    if row_count == 1 and len(columns) == 1 and numeric_cols:
+    # A single row of nothing but numbers -> one or more headline figures, not
+    # a chart at all. This also covers "compare metric A vs metric B" results
+    # (e.g. avg_bonus_2023, avg_bonus_2024 in one row): with only the old
+    # single-column check, a 1-row/2-numeric-column result fell all the way
+    # through to the "two numerics -> scatter" rule below and rendered as a
+    # scatter plot of exactly one point — a real bug, not just an edge case;
+    # any two named quantities side by side is a comparison, not a
+    # relationship between two variables across observations.
+    if row_count == 1 and numeric_cols and not other_cols and not temporal_cols:
+        noun = "value" if len(numeric_cols) == 1 else "values"
         return ChartSpec(
-            type="kpi", y=numeric_cols, reason="A single numeric value."
+            type="kpi", y=numeric_cols, reason=f"A single row of headline {noun}."
         )
 
     # A time axis plus at least one measure -> trend over time.

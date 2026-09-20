@@ -89,3 +89,25 @@ def test_bare_year_value_is_still_a_kpi_not_reclassified() -> None:
     be promoted away from the KPI rule — there'd be nothing left to chart."""
     chart = pick_chart(["founding_year"], [[1998]])
     assert chart.type == "kpi"
+
+
+def test_single_row_with_multiple_measures_is_kpi_not_scatter() -> None:
+    """SELECT AVG(bonus) FILTER (year=2023), AVG(bonus) FILTER (year=2024) —
+    a 1-row, 2-numeric-column comparison. Before this fix it fell through to
+    the "two numerics" scatter rule and rendered as a scatter plot of one
+    point, which is meaningless: this is "compare two named figures side by
+    side," not "a relationship between two variables across observations."
+    Real bug, caught from a live screenshot — not a hypothetical edge case."""
+    chart = pick_chart(
+        ["avg_bonus_2023", "avg_bonus_2024"], [[257461.0, 245021.0]]
+    )
+    assert chart.type == "kpi"
+    assert chart.y == ["avg_bonus_2023", "avg_bonus_2024"]
+
+
+def test_single_row_three_measures_is_still_kpi() -> None:
+    chart = pick_chart(
+        ["min_price", "avg_price", "max_price"], [[10.0, 25.5, 99.0]]
+    )
+    assert chart.type == "kpi"
+    assert chart.y == ["min_price", "avg_price", "max_price"]

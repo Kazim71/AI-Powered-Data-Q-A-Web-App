@@ -5,6 +5,7 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  Legend,
   Line,
   LineChart,
   Pie,
@@ -33,6 +34,7 @@ const CHART_COLORS = [
 ];
 
 const AXIS_TICK = { fontSize: 12, fill: "var(--text-muted)" };
+const LEGEND_STYLE = { fontSize: 12, color: "var(--text-muted)", paddingTop: 8 };
 
 function TooltipContent({
   active,
@@ -65,12 +67,44 @@ export function ChartView({ result }: { result: AskResponse }) {
   const data = toRecords(columns, rows);
 
   if (chart.type === "kpi") {
-    const key = chart.y[0] ?? columns[0];
-    const value = rows[0]?.[columns.indexOf(key)];
+    const keys = chart.y.length > 0 ? chart.y : [columns[0]];
+    // One headline figure gets a large single tile; several (e.g. comparing
+    // avg_bonus_2023 vs avg_bonus_2024) lay out side by side so they read as
+    // "these figures relate to each other," not as unrelated stats.
     return (
-      <div className="rounded-[var(--radius-md)] border border-border bg-surface px-5 py-6">
-        <p className="text-xs uppercase tracking-wide text-text-muted">{key}</p>
-        <p className="mt-1 font-data text-3xl font-medium">{formatCellValue(value)}</p>
+      <div
+        className={
+          keys.length === 1
+            ? "rounded-[var(--radius-md)] border border-border bg-surface px-5 py-6"
+            : "grid grid-cols-2 gap-3 sm:grid-cols-3"
+        }
+      >
+        {keys.map((key) => {
+          const value = rows[0]?.[columns.indexOf(key)];
+          return (
+            <div
+              key={key}
+              className={
+                keys.length === 1
+                  ? undefined
+                  : "rounded-[var(--radius-md)] border border-border bg-surface px-4 py-4"
+              }
+            >
+              <p className="truncate text-xs uppercase tracking-wide text-text-muted">
+                {key}
+              </p>
+              <p
+                className={
+                  keys.length === 1
+                    ? "mt-1 font-data text-3xl font-medium"
+                    : "mt-1 font-data text-xl font-medium"
+                }
+              >
+                {formatCellValue(value)}
+              </p>
+            </div>
+          );
+        })}
       </div>
     );
   }
@@ -83,6 +117,7 @@ export function ChartView({ result }: { result: AskResponse }) {
           <XAxis dataKey={chart.x ?? undefined} tick={AXIS_TICK} tickLine={false} axisLine={{ stroke: "var(--border)" }} />
           <YAxis tick={AXIS_TICK} tickLine={false} axisLine={false} width={44} />
           <Tooltip content={<TooltipContent />} />
+          {chart.y.length > 1 && <Legend wrapperStyle={LEGEND_STYLE} />}
           {chart.y.map((key, i) => (
             <Line
               key={key}
@@ -106,6 +141,7 @@ export function ChartView({ result }: { result: AskResponse }) {
           <XAxis dataKey={chart.x ?? undefined} tick={AXIS_TICK} tickLine={false} axisLine={{ stroke: "var(--border)" }} />
           <YAxis tick={AXIS_TICK} tickLine={false} axisLine={false} width={44} />
           <Tooltip content={<TooltipContent />} cursor={{ fill: "var(--surface-sunken)" }} />
+          {chart.y.length > 1 && <Legend wrapperStyle={LEGEND_STYLE} />}
           {chart.y.map((key, i) => (
             <Bar key={key} dataKey={key} fill={CHART_COLORS[i % CHART_COLORS.length]} radius={[2, 2, 0, 0]} />
           ))}
@@ -121,13 +157,23 @@ export function ChartView({ result }: { result: AskResponse }) {
       <ChartFrame>
         <PieChart>
           <Tooltip content={<TooltipContent />} />
+          {/* Names go in the legend, not as inline labels — full names (an
+           * employee, a long category) collide and overlap once you have
+           * more than three or four slices; a percentage on the slice
+           * itself plus a legend below stays legible at any label length. */}
+          <Legend
+            wrapperStyle={LEGEND_STYLE}
+            formatter={(value) => (
+              <span className="font-data text-text">{value}</span>
+            )}
+          />
           <Pie
             data={data}
             dataKey={valueKey}
             nameKey={nameKey}
-            outerRadius={90}
+            outerRadius={85}
             label={(entry: PieLabelRenderProps) =>
-              String((entry as unknown as Record<string, unknown>)[nameKey])
+              entry.percent ? `${Math.round(entry.percent * 100)}%` : ""
             }
             labelLine={false}
           >
@@ -161,7 +207,7 @@ export function ChartView({ result }: { result: AskResponse }) {
 
 function ChartFrame({ children }: { children: React.ReactElement }) {
   return (
-    <div className="h-64 rounded-[var(--radius-md)] border border-border bg-surface p-3">
+    <div className="h-72 rounded-[var(--radius-md)] border border-border bg-surface p-3 pb-1">
       <ResponsiveContainer width="100%" height="100%">
         {children}
       </ResponsiveContainer>

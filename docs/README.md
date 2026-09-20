@@ -4,6 +4,10 @@ Everything about how this app is built, why, and how to run it.
 
 ## Start here
 
+**Reviewing this for the first time? Start with [10 · Project overview](10-project-overview.md)**
+— a self-contained what/why/how, with the tech-stack rationale and real tested scenarios.
+Everything below is the deep-dive version of one part of that page.
+
 | Doc | What it covers |
 |---|---|
 | [00 · Build plan](00-build-plan.md) | Original scoping, stack choice, 6-hour schedule |
@@ -16,6 +20,7 @@ Everything about how this app is built, why, and how to run it.
 | [07 · Progress log](07-progress-log.md) | What was built when, and bugs found along the way |
 | [08 · Roadmap](08-roadmap.md) | Milestone status and what comes next |
 | [09 · Frontend design direction](09-frontend-design-direction.md) | Binding UI/UX brief for the frontend |
+| [10 · Project overview](10-project-overview.md) | **Start here** — self-contained what/why/how for review or presentation |
 
 ## Decisions
 

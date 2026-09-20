@@ -343,3 +343,84 @@ changes (which don't touch app code, but worth confirming nothing else regressed
 ### Not done this session
 Nothing was actually deployed — that needs the user's own Vercel/Render accounts, which I don't
 have access to. Everything above is prep; the deploy itself is still the next step.
+
+---
+
+## 2026-09-20/21 · Session 7 — First real deploy, live debugging, submission prep
+
+The actual first deployment, done together with the user live: I diagnosed each failure from
+screenshots/pasted logs (no browser tool this session), the user made the dashboard changes.
+
+### Deploy issues hit, in order, each a real config problem, not a code bug
+1. **Render: `Dockerfile: no such file or directory`.** Root Directory wasn't set to
+   `backend`, so Render looked for the Dockerfile at the repo root. Fixed in Render Settings.
+2. **Vercel: platform-level 404 on every route**, despite the build reporting "Ready." Root
+   Directory *was* correctly set to `frontend` this time — the actual cause was **Framework
+   Preset** not being "Next.js." When Vercel doesn't know it's building a Next.js app, it
+   serves the build output as plain static files instead of through the Next.js runtime, so
+   the build succeeds but nothing is servable. This is a materially different failure mode
+   from #1 and worth knowing apart: "build succeeded but every route 404s" almost always means
+   framework detection, not a missing file.
+3. **`NEXT_PUBLIC_API_URL` not set** → app correctly showed "Could not reach the server at
+   `http://localhost:8000/api`" (the connection-error fix from session 5, working exactly as
+   designed, live, for the first time). Vercel additionally blocked saving the variable at all
+   under its newer **Secret vs. Config** type distinction: a `NEXT_PUBLIC_` key can't be typed
+   "Secret" (write-only, never re-readable) because it's inlined into the public JS bundle by
+   definition — Vercel now requires "Config" (readable, non-sensitive) for any
+   `NEXT_PUBLIC_`-prefixed key. Not documented anywhere I'd already written; worth knowing for
+   next time.
+4. **CORS**: `CORS_ORIGINS` on Render was still the local placeholder
+   (`http://localhost:3000`) from before Vercel existed. Confirmed via a raw OPTIONS preflight
+   with `curl` before touching the dashboard (no `access-control-allow-origin` header came
+   back for the Vercel origin) and again after the fix (header present) — cheaper and more
+   certain than trial-and-error in the browser.
+5. **Two local commits were never pushed to GitHub** (`16de2aa` M2, `e84018c` env fix) — Render
+   had only ever built the very first commit. Caught by comparing `git log` against
+   `git log origin/master --oneline`, not by guessing.
+
+Backend fully verified end-to-end through the real public URLs (session created, files
+uploaded, a real question answered correctly) after each fix, via `curl` with an explicit
+`Origin` header matching what a real browser sends — not just "the button worked," but
+confirmation the exact mechanism (CORS, env inlining) was actually fixed.
+
+### Real bug found from a live screenshot: single-row multi-metric comparison charted as scatter
+*"What's the average bonus in 2023 compared to 2024?"* returned two numeric columns
+(`avg_bonus_2023`, `avg_bonus_2024`) in one row. The old KPI rule only matched exactly one
+numeric column, so this fell through to "two numerics → scatter," rendering as a scatter plot
+of a single point — meaningless, and visibly wrong in the screenshot the user sent. Fixed:
+`charts.py`'s KPI rule now matches *any* single-row, numbers-only result, not just one column;
+`ChartView.tsx`'s KPI branch now renders a grid of stat tiles when there's more than one
+value, not just the first one. Two new tests pin the exact scenario from the screenshot.
+Verified locally (this fix isn't live yet — needs a push + redeploy).
+
+Also improved while fixing this: the pie chart's inline labels (full names/categories printed
+directly on the slice) were colliding and overlapping once there were more than 3–4 slices,
+visible in the same screenshot — switched to percentage-only inline labels plus a proper
+`<Legend>` below mapping colour to name. Added a `<Legend>` to multi-series bar/line charts
+too, which previously had no way to tell which colour meant which series.
+
+### Added: a second sample dataset
+`sample-data/ecommerce/` — customers/products/orders, deliberately a different domain from the
+HR dataset, so "it works" isn't an artifact of one convenient shape of data. Ran 5 real
+questions against it locally (KPI, pie, line, bar, another KPI) — all correct first try, zero
+repairs. Both datasets' verified results are now in `docs/10-project-overview.md`.
+
+### Documentation
+- **`WRITEUP.md`** (repo root) — the ≤1-page write-up the brief explicitly requires
+  (approach, key decisions, what's next). Existed nowhere until this session.
+- **`docs/10-project-overview.md`** — a new, self-contained what/why/how doc for
+  presentation/review: the core idea, full request-flow walkthrough, a stack-choice table with
+  rejected alternatives named for each row, the tested-scenarios table from both datasets, and
+  known limitations stated up front rather than left for a reviewer to find.
+- Screenshots: **not captured this session — no browser tool available.** Wired five
+  placeholders into `docs/10-project-overview.md` pointing at exact filenames in `docs/assets/`
+  with a precise, ~2-minute capture list (what to screenshot, in what state), so dropping the
+  files in is the only remaining step.
+
+### Not done this session
+The chart fix and second sample dataset are not live — need a commit, push, and redeploy on
+both Render and Vercel (should be quick now that the deploy pipeline itself is proven to work).
+Screenshots need the user to capture them by hand, per the list above. The theme/UI was
+reported as "very bad" by the user with no specifics given and no browser access on my end to
+diagnose further — made the concrete, justifiable fixes above (pie legibility, KPI layout) but
+did not attempt to guess-and-redesign the rest blind; asked the user for specifics in chat.
