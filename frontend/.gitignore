@@ -32,9 +32,17 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel
+
+# machine-local npm workaround — see docs/07-progress-log.md session 4.
+# NOT a project setting: hardcodes a Windows path, would break any Linux
+# build (Vercel, CI, a teammate's Mac) if it were checked in. Recreate it
+# locally if you hit the same "Q&A"-in-path npm/npx bug, per
+# frontend/README.md.
+.npmrc
 
 # typescript
 *.tsbuildinfo
